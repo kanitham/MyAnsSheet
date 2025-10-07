@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AnswerSheet</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    .controls {
+      margin-top: 20px;
+    }
+    .report {
+      margin-top: 30px;
+      padding: 15px;
+      border: 1px solid #333;
+      background: #f9f9f9;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>AnswerSheet</h1>
+  <table id="answerTable">
+    <thead>
+      <tr>
+        <th>Question #</th>
+        <th>A</th>
+        <th>B</th>
+        <th>C</th>
+        <th>D</th>
+      </tr>
+    </thead>
+    <tbody id="answerBody">
+      <!-- Rows go here -->
+    </tbody>
+  </table>
+
+  <div class="controls">
+    <button onclick="addQuestion()">Add Question</button>
+    <button onclick="submitAnswers()">Submit</button>
+  </div>
+
+  <div id="report" class="report" style="display:none;"></div>
+
+  <script>
+    let questionCount = 0;
+
+    function addQuestion() {
+      questionCount++;
+      const tbody = document.getElementById('answerBody');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${questionCount}</td>
+        ${['A', 'B', 'C', 'D'].map(opt => `
+          <td>
+            <input type="radio" name="q${questionCount}" value="${opt}">
+          </td>`).join('')}
+      `;
+      tbody.appendChild(row);
+    }
+
+    function initializeQuestions(count) {
+      for (let i = 0; i < count; i++) {
+        addQuestion();
+      }
+    }
+
+    function submitAnswers() {
+      const unanswered = [];
+      const responses = [];
+
+      for (let i = 1; i <= questionCount; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        if (selected) {
+          responses.push({ question: i, answer: selected.value });
+        } else {
+          responses.push({ question: i, answer: "Not Answered" });
+          unanswered.push(i);
+        }
+      }
+
+      if (unanswered.length > 0) {
+        const proceed = confirm(`You have unanswered questions: ${unanswered.join(", ")}. Do you want to submit anyway?`);
+        if (!proceed) return;
+      }
+
+      // Display report
+      const reportDiv = document.getElementById('report');
+      const timestamp = new Date().toLocaleString();
+      let reportText = `Submission Report\nDate & Time: ${timestamp}\n\nResponses:\n`;
+      responses.forEach(r => {
+        reportText += `Q${r.question}: ${r.answer}\n`;
+      });
+      reportDiv.style.display = 'block';
+      reportDiv.textContent = reportText;
+    }
+
+    // Initialize with 10 questions
+    initializeQuestions(10);
+  </script>
+
+</body>
+</html>
