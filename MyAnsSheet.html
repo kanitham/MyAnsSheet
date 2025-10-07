@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>AnswerSheet</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -28,11 +29,22 @@
       background: #f9f9f9;
       white-space: pre-wrap;
     }
+    #timer {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    input[type="number"] {
+      width: 60px;
+    }
   </style>
 </head>
 <body>
 
   <h1>AnswerSheet</h1>
+
+  <div id="timer">Time Elapsed: 00:00</div>
+
   <table id="answerTable">
     <thead>
       <tr>
@@ -44,19 +56,67 @@
       </tr>
     </thead>
     <tbody id="answerBody">
-      <!-- Rows go here -->
+      <!-- Questions go here -->
     </tbody>
   </table>
 
   <div class="controls">
-    <button onclick="addQuestion()">Add Question</button>
+    <label for="bulkCount">
+      Bulk Add Questions:
+      <input type="number" id="bulkCount" min="1" placeholder="1" />
+    </label>
+    <button onclick="handleAddQuestions()">Add Question(s)</button>
     <button onclick="submitAnswers()">Submit</button>
+    <button onclick="exportPDF()">Export PDF</button>
   </div>
 
   <div id="report" class="report" style="display:none;"></div>
 
   <script>
     let questionCount = 0;
+    let startTime = Date.now();
+    let timerInterval;
+
+    function formatTime(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const minutes = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const seconds = String(totalSec % 60).padStart(2, '0');
+      return `${minutes}:${seconds}`;
+    }
+
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        document.getElementById('timer').textContent = `Time Elapsed: ${formatTime(elapsed)}`;
+      }, 1000);
+    }
+
+    function saveToLocalStorage() {
+      const responses = {};
+      for (let i = 1; i <= questionCount; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        if (selected) {
+          responses[`q${i}`] = selected.value;
+        }
+      }
+      localStorage.setItem('answerSheet', JSON.stringify({
+        questionCount,
+        responses
+      }));
+    }
+
+    function loadFromLocalStorage() {
+      const data = JSON.parse(localStorage.getItem('answerSheet'));
+      if (!data) return;
+      for (let i = 0; i < data.questionCount; i++) {
+        addQuestion();
+      }
+      Object.keys(data.responses).forEach(key => {
+        const value = data.responses[key];
+        const radio = document.querySelector(`input[name="${key}"][value="${value}"]`);
+        if (radio) radio.checked = true;
+      });
+    }
 
     function addQuestion() {
       questionCount++;
@@ -66,13 +126,18 @@
         <td>${questionCount}</td>
         ${['A', 'B', 'C', 'D'].map(opt => `
           <td>
-            <input type="radio" name="q${questionCount}" value="${opt}">
+            <input type="radio" name="q${questionCount}" value="${opt}" onchange="saveToLocalStorage()">
           </td>`).join('')}
       `;
       tbody.appendChild(row);
     }
 
-    function initializeQuestions(count) {
+    function handleAddQuestions() {
+      const countInput = document.getElementById('bulkCount');
+      let count = parseInt(countInput.value);
+      if (isNaN(count) || count < 1) {
+        count = 1;
+      }
       for (let i = 0; i < count; i++) {
         addQuestion();
       }
@@ -97,19 +162,52 @@
         if (!proceed) return;
       }
 
-      // Display report
+      // Show report
       const reportDiv = document.getElementById('report');
       const timestamp = new Date().toLocaleString();
-      let reportText = `Submission Report\nDate & Time: ${timestamp}\n\nResponses:\n`;
+      let reportText = `Submission Report\nDate & Time: ${timestamp}\nTime Elapsed: ${formatTime(Date.now() - startTime)}\n\nResponses:\n`;
       responses.forEach(r => {
         reportText += `Q${r.question}: ${r.answer}\n`;
       });
+
       reportDiv.style.display = 'block';
       reportDiv.textContent = reportText;
+
+      // Save report
+      localStorage.setItem('answerSheetSubmission', reportText);
     }
 
-    // Initialize with 10 questions
-    initializeQuestions(10);
+    async function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const report = document.getElementById('report').textContent;
+      if (!report) {
+        alert("Please submit before exporting PDF.");
+        return;
+      }
+      const lines = report.split('\n');
+      let y = 10;
+      lines.forEach(line => {
+        doc.text(line, 10, y);
+        y += 8;
+      });
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      doc.save(`AnswerSheet_${timestamp}.pdf`);
+    }
+
+    // Initialize app
+    window.onload = () => {
+      initializeQuestions(10);
+      loadFromLocalStorage();
+      startTimer();
+    };
+
+    function initializeQuestions(count) {
+      for (let i = 0; i < count; i++) {
+        addQuestion();
+      }
+    }
   </script>
 
 </body>
